@@ -1,26 +1,47 @@
-provider "ssh" {
-  host     = var.host
-  user     = var.ssh_user
-  private_key = file(var.ssh_private_key_path)
-}
+resource "null_resource" "k8s_node" {
+  count = length(var.node_ips)
 
-resource "null_resource" "k8s_install" {
   connection {
     type        = "ssh"
-    host        = var.host
+    host        = var.node_ips[count.index]
     user        = var.ssh_user
     private_key = file(var.ssh_private_key_path)
   }
 
   provisioner "file" {
-    source      = "${path.module}/install_k8s.sh"
-    destination = "/tmp/install_k8s.sh"
+  source      = "${path.module}/scripts/install_k8s_prereqs.sh"
+  destination = "/tmp/install_k8s_prereqs.sh"
+}
+
+  provisioner "remote-exec" {
+    inline = [
+      "chmod +x /tmp/install_k8s_prereqs.sh",
+        "sudo /tmp/install_k8s_prereqs.sh"
+  ]
+}
+
+  provisioner "file" {
+    source      = "${path.module}/scripts/cni_flannel.sh"
+    destination = "/tmp/cni_flannel.sh"
   }
 
   provisioner "remote-exec" {
     inline = [
-      "chmod +x /tmp/install_k8s.sh",
-      "sudo /tmp/install_k8s.sh ${var.node_type}"
+      "chmod +x /tmp/cni_flannel.sh",
+      "sudo /tmp/cni_flannel.sh ${var.pod_cidr}"
+    ]
+  }
+
+  provisioner "file" {
+    source      = "${path.module}/scripts/"
+    destination = "/tmp/"
+  }
+  provisioner "remote-exec" {
+    inline = [
+      "chmod +x /tmp/*.sh",
+      var.node_roles[count.index] == "master" ?
+        "sudo /tmp/install_k8s_master.sh" :
+        "sudo /tmp/install_k8s_worker.sh"
     ]
   }
 }

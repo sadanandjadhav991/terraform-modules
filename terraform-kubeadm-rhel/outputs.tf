@@ -1,3 +1,4 @@
-output "k8s_node" {
-  value = var.host
+output "kubeconfig" {
+  value = file("/etc/kubernetes/admin.conf")
+  sensitive = true
 }
